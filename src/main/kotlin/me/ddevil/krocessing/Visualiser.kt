@@ -6,19 +6,83 @@ import g4p_controls.*
 import com.mpatric.mp3agic.Mp3File
 import com.mpatric.mp3agic.ID3v1Tag
 import com.mpatric.mp3agic.ID3v1
+import ddf.minim.AudioListener
 import java.io.File
+import kotlin.math.roundToInt
 
 
-@ExperimentalUnsignedTypes
+import ddf.minim.*;
+import ddf.minim.ugens.*;
+class AudioAnalyzer : Entity() {
+    lateinit var panel: GPanel
+    lateinit var lLabel: GLabel
+    lateinit var rLabel: GLabel
+    lateinit var bufLabel: GLabel
+    lateinit var indexLabel: GLabel
+    override fun setup(krocessing: Krocessing) {
+        lLabel = GLabel(krocessing, 0.0F, 0.0F, kLineWidth, kLineHeight, "Left sample")
+        rLabel = GLabel(krocessing, 0.0F, 0.0F, kLineWidth, kLineHeight, "Right sample")
+        bufLabel = GLabel(krocessing, 0.0F, 0.0F, kLineWidth, kLineHeight, "Buffer Size")
+        indexLabel = GLabel(krocessing, 0.0F, 0.0F, kLineWidth, kLineHeight, "Sample Index")
+
+        val widgets =
+            listOf(lLabel, rLabel, bufLabel, indexLabel)
+        panel = GPanel(krocessing, 500.0F, 300.0F, kLineWidth, (widgets.size + 1.5F) * kLineHeight, "Analyzer")
+        build(panel, widgets)
+    }
+
+    private var currentIndex = 0
+    override fun draw(krocessing: Krocessing) {
+        val p = krocessing.player ?: return
+        if (!p.isPlaying) {
+            return
+        }
+        currentIndex++
+        if (currentIndex >= p.bufferSize()) {
+            currentIndex = 0
+        }
+        val lSample = p.left.get(currentIndex)
+        val rSample = p.right.get(currentIndex)
+        lLabel.text = "Left Sample: $lSample, ${Integer.toHexString(lSample.toRawBits())}"
+        rLabel.text = "Right Sample: $rSample, ${Integer.toHexString(rSample.toRawBits())}"
+        bufLabel.text = "Buffer Size: ${p.bufferSize()}"
+        indexLabel.text = "Sample Index: $currentIndex"
+        val lStr = lSample.toString()
+        val rStr = rSample.toString()
+        krocessing.text(lStr, krocessing.width - krocessing.textWidth(lStr) - 50, 50.0F)
+        krocessing.text(rStr, krocessing.width - krocessing.textWidth(rStr) - 50, 150.0F)
+    }
+}
+
+class AnimatedBackground : Entity() {
+
+    private var currentIndex = 0
+    override fun draw(krocessing: Krocessing) {
+        val p = krocessing.player
+        if (p == null || !p.isPlaying) {
+            krocessing.background(0xFF0000, 255.0F)
+            return
+        }
+        currentIndex++
+        if (currentIndex >= p.bufferSize()) {
+            currentIndex = 0
+        }
+        val lSample = p.left.get(currentIndex)
+        val rSample = p.right.get(currentIndex)
+        val fl = (1 + lSample) / 2
+        val fr = (1 + rSample) / 2
+        krocessing.background(fl * 255)
+
+        krocessing.stroke(rSample.toRawBits())
+
+    }
+}
+
 class AudioWaveRenderer : Entity() {
     override fun draw(krocessing: Krocessing) {
-        krocessing.background(0x101010)
         val p = krocessing.player ?: return
-        krocessing.background(0);
-        krocessing.stroke(255)
         for (i in 0 until p.bufferSize() - 1) {
             krocessing.line(i.toFloat(), 50 + p.left.get(i) * 50, 50 + p.left.get(i) * 50, 50 + p.left.get(i + 1) * 50)
-
             krocessing.line(i.toFloat(), 150 + p.right.get(i) * 50, (i + 1).toFloat(), 150 + p.right.get(i + 1) * 50)
         }
     }
@@ -26,9 +90,8 @@ class AudioWaveRenderer : Entity() {
 
 const val kSaveWidth = 50.0F
 const val kLineHeight = 30.0F
-const val kLineWidth = 200.0F
+const val kLineWidth = 300.0F
 
-@ExperimentalUnsignedTypes
 class AudioMetaEditor : Entity() {
     private var audioMeta: AudioMeta? = null
     private lateinit var metaPanel: GPanel
@@ -125,11 +188,6 @@ class AudioMetaEditor : Entity() {
             this.promptText = name
         }
 
-    private fun build(metaPanel: GPanel, fields: List<GTextField>) {
-        fields.forEachIndexed { index, gTextField ->
-            metaPanel.addControl(gTextField, 0.0F, index * kLineHeight + metaPanel.tabHeight)
-        }
-    }
 
     private var p: AudioPlayer? = null
 
@@ -178,4 +236,10 @@ data class AudioMeta(
 
 fun GAbstractControl.alignRightOf(panel: GPanel, width: Float, height: Float) {
     this.moveTo(panel.width - width, (panel.tabHeight / 2.0F) + panel.height - height)
+}
+
+private fun build(metaPanel: GPanel, fields: List<GAbstractControl>) {
+    fields.forEachIndexed { index, gTextField ->
+        metaPanel.addControl(gTextField, 0.0F, index * kLineHeight + metaPanel.tabHeight)
+    }
 }

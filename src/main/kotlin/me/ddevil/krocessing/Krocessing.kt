@@ -17,12 +17,10 @@ class Krocessing(e: List<Entity>) : PApplet() {
         fun run() {
             val k = Krocessing(
                 listOf(
-                    CompositeEntity(
-                        listOf(
-                            AudioWaveRenderer(),
-                            AudioMetaEditor()
-                        )
-                    )
+                    AnimatedBackground(),
+                    AudioWaveRenderer(),
+                    AudioMetaEditor(),
+                    AudioAnalyzer()
                 )
             )
             k.setSize(800, 600)
